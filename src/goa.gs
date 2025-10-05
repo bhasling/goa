@@ -4,8 +4,10 @@
  * An application to organize your Gmail Inbox and folders.
  * ****************************************/
 
-/** Main function to origanize email. */
+/** Main function to organize emails. */
 function organizeEmail() {
+
+  // State object holding all the variables in the state for the application
   var state = {
     goodEmailAddresses: [],
     emailAddressToFolderMap: {},
@@ -18,6 +20,7 @@ function organizeEmail() {
     folderLabels: [],
     batchSize: 100,
     wakeWord: "goa",
+    unknownSendersFolder: "UnknownSenders",
 
     // statistics
     numberOfMessagesWithUnknownSender: 0,
@@ -29,31 +32,47 @@ function organizeEmail() {
   };
   //debugContact();
   //return;
+
+  // Read and organize the first batchSize messages in the InBox
   readInbox(state);
+
+  // Report the results by sending a summary email
   reportResults(state);
 }
 
 /** Read the email in the inbox and classify messages into state. */
 function readInbox(state) {
   var returnCode = 0;
+
+  // Loop to restart reading the emails after finding a GOA action email
   for (var j = 0; j < 2; j++) {
     returnCode = 0;
+
+    // Read the persisted properties of the GOA application from Google properties
     readUserProperties(state);
+
+    // Get the most recent threads from the InBox for a batch to process
     var threads = GmailApp.getInboxThreads(0, state.batchSize);
 
-    // Loop through each thread
+    // Loop through each thread in the batch
     for (var i = 0; i < threads.length; i++) {
       state.numberofEmailThreadsProcessed = state.numberofEmailThreadsProcessed + 1;
       // Got an email address thread (which may have several messages)
       var emailThread = threads[i];
+
+      // Process all the messages in the thread
       var messagesInThread = emailThread.getMessages();
       for (var j = 0; j < messagesInThread.length; j++) {
         var msg = messagesInThread[j];
         returnCode = processMessage(state, emailThread, msg);
+
+        // Break from the message loop if we found a GOA action
         if (returnCode) {
           break;
         }
       }
+
+      // Break from the thread loop if we found a GOA action
       if (returnCode) {
         break;
       }
@@ -62,23 +81,40 @@ function readInbox(state) {
   }
 }
 
-/** Read a single message and classify that message into state.*/
+/** 
+ * Read a single message and classify that message into state.
+ * 
+ * Return non-zero return code if the message with a GOA action.
+ * A non-zero return code causes the main loop to restart reading
+ * the InBox after making the changes specified in the action.
+ */
 function processMessage(state, emailThread, msg) {
   state.numberEmailsProcessed = state.numberEmailsProcessed + 1;
+
+  // Check if this message is a GOA action message
   var from = msg.getFrom();
   var subject = msg.getSubject();
   var returnCode = parseGoaMessage(state, subject, emailThread);
   if (returnCode) {
     return returnCode;
   }
-  var match = from.match(/<([^>]+)>/);
+
+  // Parse out the email address string from the "from" of message.
   var emailAddress = null;
+  var match = from.match(/<([^>]+)>/);
   if (match) {
     emailAddress = match[1];
   } else {
     emailAddress = from;
   }
+
+  // Find a GOA configured folder label that is label in the contacts of the email Message
   var folderLabel = state.emailAddressToFolderMap[emailAddress];
+
+  // Classify the message based on the email address contacts
+  // Update the statistics of the email and move the email
+  // to different label folders if necessary
+
   if (folderLabel) {
     // Email Address contact is associated with a folderLabel
     applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
@@ -95,7 +131,7 @@ function processMessage(state, emailThread, msg) {
   } else if (state.badEmailAddresses.indexOf(emailAddress) >= 0) {
     // Email Address contact is already determined to be bad
     state.numberNoContactMessages = state.numberNoContactMessages + 1;
-    applyLabelToEmailMessage(state, emailThread, msg, emailAddress, "UnknownSenders");
+    applyLabelToEmailMessage(state, emailThread, msg, emailAddress, state.unknownSendersFolder);
     //Logger.log(`${emailAddress} is not in contacts`);
   } else {
     // Email address contact person has not been seen yet
@@ -122,33 +158,45 @@ function applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderL
 
 /** Classify the emailAddress by the contact information about the emailAddress and store classification in state. */
 function classifyEmailContact(state, emailThread, msg, emailAddress) {
+  // Get the contact information about the email address
   var contactInfoList = getEmailAddressContactInfo(emailAddress);
   if (contactInfoList) {
+    //  If the email addess is in the users contact list find groups of that contact
     groups = getContactGroups(state, contactInfoList);
+
+    // Look and the GOA configured folder labels to see if user is in that group
     for (var i = 0; i < state.folderLabels.length; i++) {
       var folderLabel = state.folderLabels[i];
       if (groups.indexOf(folderLabel) >= 0) {
-        // the contact of the email address is in this folder group
+        // the contact of the email address is in this GOA folder group
+        // Save that this email address is in this folder group
         state.folderEmailAddressesMap[emailAddress] = folderLabel;
+
+        // Move the email to the folder group and update the GOA statistics
         var count = state.numberFolderMessagesMap[folderLabel];
         count = count ? count : 0;
         count = count + 1;
         state.numberFolderMessagesMap[folderLabel] = count;
         applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
 
+        // Return because we handled this email message
         return;
       }
     }
-    // If the contact is not in any of the folder groups it is still good
+
+    // If the contact is not in any of the folder groups it is considered good
+    // because this is an email in the contact list, just not moved to a folder
     state.goodEmailAddresses.push(emailAddress);
     state.numberContactMessages = state.numberContactMessages + 1;
+
   } else {
+    // The email is not associated with a contact
+    // Save the email address as not having a contact and update statistics
     state.badEmailAddresses.push(emailAddress);
     state.numberNoContactMessages = state.numberNoContactMessages + 1;
-    applyLabelToEmailMessage(state, emailThread, msg, emailAddress, "UnknownSenders");
+    // Move this email thread to the unknown senders folder
+    applyLabelToEmailMessage(state, emailThread, msg, emailAddress, state.unknownSendersFolder);
   }
-  return;
-
 }
 
 /** 
@@ -315,7 +363,7 @@ function reportResults(state) {
   htmlBody = htmlBody + "<ul>\n";
   htmlBody = htmlBody + `<li>${state.numberContactMessages} messages from your contacts (left in InBox).</li>\n`
   htmlBody = htmlBody + `<li>${state.numberNoContactMessages} messages from no contact senders (moved to UnknownSenders folder).</li>\n`
-  htmlBody = htmlBody + `<li>${state.numberOfMessagesWithUnknownSender} messages from senders with no email address (moved to UnknownSenders folder).</li>\n`;
+  htmlBody = htmlBody + `<li>${state.numberOfMessagesWithUnknownSender} messages from senders with no email address (moved to ${state.unknownSendersFolder} folder).</li>\n`;
   const keys = Object.keys(state.numberFolderMessagesMap);
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
@@ -339,8 +387,8 @@ function reportResults(state) {
 
 /** Debug function (not used) to check the contact information about an email address. */
 function debugContact() {
-    var emailAddress = "tshannontopspin@verizon.net";
-    var contactInfoList = getEmailAddressContactInfo(emailAddress);
-    Logger.log(contactInfoList);
+  var emailAddress = "tshannontopspin@verizon.net";
+  var contactInfoList = getEmailAddressContactInfo(emailAddress);
+  Logger.log(contactInfoList);
 }
 
