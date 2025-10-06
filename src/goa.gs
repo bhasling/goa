@@ -2,6 +2,7 @@
  * GOA - GMAIL Origanize App.
  * 
  * An application to organize your Gmail Inbox and folders.
+ * Source code is in Google Drive: https://drive.google.com
  * ****************************************/
 
 /** Main function to organize emails. */
@@ -15,6 +16,8 @@ function organizeEmail() {
     badEmailAddresses: [],
     emailAddressMap: {},
     numberOfStatusEmails: 0,
+    previousStatistics: null,
+    statusMessageNotRead: false,
 
     // configuration options
     folderLabels: [],
@@ -23,13 +26,14 @@ function organizeEmail() {
     unknownSendersFolder: "UnknownSenders",
 
     // statistics
-    stats : {
+    stats: {
       numberOfMessagesWithUnknownSender: 0,
       numberNoContactMessages: 0,
       numberContactMessages: 0,
       numberFolderMessagesMap: {},
       numberEmailsProcessed: 0,
-      numberofEmailThreadsProcessed: 0
+      numberOfEmailThreadsProcessed: 0,
+      numberOfActionMessages: 0,
     }
   };
   //debugContact();
@@ -58,7 +62,7 @@ function readInbox(state) {
 
     // Loop through each thread in the batch
     for (var i = 0; i < threads.length; i++) {
-      state.stats.numberofEmailThreadsProcessed = state.stats.numberofEmailThreadsProcessed + 1;
+      state.stats.numberOfEmailThreadsProcessed = state.stats.numberOfEmailThreadsProcessed + 1;
       // Got an email address thread (which may have several messages)
       var emailThread = threads[i];
 
@@ -96,7 +100,7 @@ function processMessage(state, emailThread, msg) {
   // Check if this message is a GOA action message
   var from = msg.getFrom();
   var subject = msg.getSubject();
-  var returnCode = parseGoaMessage(state, subject, emailThread);
+  var returnCode = parseGoaMessage(state, subject, emailThread, msg);
   if (returnCode) {
     return returnCode;
   }
@@ -282,6 +286,11 @@ function readUserProperties(state) {
     state.folderLables = [];
   }
 
+  var statsJson = userProps.getProperty("gmail_apps.previousStatistics");
+  if (statsJson) {
+    state.previousStatistics = JSON.parse(statsJson);
+  }
+
   const batchSizeString = userProps.getProperty("gmail_apps.batchSize");
   if (batchSizeString) {
     state.batchSize = parseInt(batchSizeString);
@@ -307,13 +316,13 @@ function initializeFolderLabels(labels) {
  * Returning non-zero causes the main loop to restart and start processing
  * InBox messages using the new action changes that are now stored in state.
  */
-function parseGoaMessage(state, subject, emailThread) {
+function parseGoaMessage(state, subject, emailThread, msg) {
   if (subject.includes(state.wakeWord.toUpperCase() + " Organize Email")) {
-    state.numberOfStatusEmails = state.numberOfStatusEmails + 1;
-    if (state.numberOfStatusEmails > 2) {
-      emailThread.moveToTrash();
-      return 0;
+    if (msg.isUnread()) {
+      state.statusMessageNotRead = true;
     }
+    emailThread.moveToTrash();
+    return 0;
   } else {
     if (subject.toLowerCase().includes(state.wakeWord.toLowerCase())) {
       var parts = subject.split(" ");
@@ -327,6 +336,7 @@ function parseGoaMessage(state, subject, emailThread) {
                 initializeFolderLabels(state.folderLabels);
                 emailThread.moveToTrash();
               }
+              state.stats.numberOfActionMessages += 1;
               return -1;
             }
           } else if (["delete", "remove", "disable"].includes(parts[1].toLowerCase())) {
@@ -335,6 +345,7 @@ function parseGoaMessage(state, subject, emailThread) {
               state.folderLabels = state.folderLabels.filter(item => item !== folder);
               initializeFolderLabels(state.folderLabels);
               emailThread.moveToTrash();
+              state.stats.numberOfActionMessages += 1;
               return -1;
             }
           } else if (["set", "assign"].includes(parts[1].toLowerCase())) {
@@ -344,6 +355,7 @@ function parseGoaMessage(state, subject, emailThread) {
               const userProps = PropertiesService.getUserProperties();
               userProps.setProperty("gmail_apps.batchSize", batchSize.toString());
               emailThread.moveToTrash();
+              state.stats.numberOfActionMessages += 1;
               return -1;
             }
           }
@@ -354,6 +366,32 @@ function parseGoaMessage(state, subject, emailThread) {
   return 0;
 }
 
+function saveStatistics(state) {
+  const userProps = PropertiesService.getUserProperties();
+  userProps.setProperty("gmail_apps.previousStatistics", JSON.stringify(state.stats));
+
+}
+
+function addPreviousStats(state) {
+  if (state.previousStatistics) {
+    state.stats.numberOfMessagesWithUnknownSender += state.previousStatistics.numberOfMessagesWithUnknownSender;
+    state.stats.numberNoContactMessages += state.previousStatistics.numberNoContactMessages;
+    state.stats.numberEmailsProcessed += state.previousStatistics.numberEmailsProcessed;
+    state.stats.numberOfEmailThreadsProcessed += state.previousStatistics.numberOfEmailThreadsProcessed;
+    state.stats.numberOfActionMessages += state.previousStatistics.numberOfActionMessages;
+    if (state.previousStatistics.numberFolderMessagesMap) {
+      var keys = Object.keys(state.previousStatistics.numberFolderMessagesMap);
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var oldCount = state.previousStatistics.numberFolderMessagesMap[key];
+        var newCount = state.stats.numberFolderMessagesMap[key];
+        newCount = newCount ? newCount : 0;
+        newCount += oldCount;
+        state.stats.numberFolderMessagesMap[key] = newCount;
+      }
+    }
+  }
+}
 /** 
  * Report statistics about results.
  * 
@@ -361,10 +399,17 @@ function parseGoaMessage(state, subject, emailThread) {
  * and instructions how to send email back to Goa to perform actions.
  */
 function reportResults(state) {
-  var htmlBody = `The organizeEmail Google App in your account read ${state.stats.numberEmailsProcessed} email messsages (${state.stats.numberofEmailThreadsProcessed} threads).\n`;
+  if (state.statusMessageNotRead) {
+    addPreviousStats(state);
+  } else {
+  }
+  saveStatistics(state);
+
+  var htmlBody = `The organizeEmail Google App in your account read ${state.stats.numberEmailsProcessed} email messsages (${state.stats.numberOfEmailThreadsProcessed} threads).\n`;
   htmlBody = htmlBody + "<ul>\n";
   htmlBody = htmlBody + `<li>${state.stats.numberContactMessages} messages from your contacts (left in InBox).</li>\n`
   htmlBody = htmlBody + `<li>${state.stats.numberNoContactMessages} messages from no contact senders (moved to ${state.unknownSendersFolder} folder).</li>\n`
+  htmlBody = htmlBody + `<li>${state.stats.numberOfActionMessages} action messages.</li>\n`
   htmlBody = htmlBody + `<li>${state.stats.numberOfMessagesWithUnknownSender} messages from senders with no email address (moved to ${state.unknownSendersFolder} folder).</li>\n`;
   const keys = Object.keys(state.stats.numberFolderMessagesMap);
   for (var i = 0; i < keys.length; i++) {
@@ -393,4 +438,3 @@ function debugContact() {
   var contactInfoList = getEmailAddressContactInfo(emailAddress);
   Logger.log(contactInfoList);
 }
-
