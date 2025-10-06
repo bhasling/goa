@@ -89,8 +89,8 @@ the two look very much the same and you can think of these as folders if you wan
 
 There are differences and the differences are what often confuse people.
 * A message may have multiple labels. That means it can look like it is in multiple folders, but it still one message.
-* A label can have many message. (Not really, it is really the meessage that has label not the folder that has messages). However in the UI you can click on a label and see all its messages so it looks like a folder. 
-In Gmail when you open a message you can see all the labels that message has and click a checkbox to remove a message from that label.
+* A label can have many messages. (Not really - it is really the meessage that has label not the folder that has messages). However in the UI you can click on a label and see all its messages so it looks like a folder. 
+In Gmail when you open a message you can see all the labels of that message and click a checkbox to remove a label from that message.
 
 If you move a message to trash you are just labeling it to with the trash label. It is not removed until you delete it.
 
@@ -98,5 +98,5 @@ If you move a message to trash you are just labeling it to with the trash label.
 
 Gmail has the concept of a thread. A thread is a list of email messages that have the same subject text.
 A thread is created when someone replies to an email or sends a new message with the same subject line as a previous email.
-Normally, in labels are applied to threads and viewed in the GMail UI as threads.
+Normally labels are applied to threads and viewed in the GMail UI as threads.
    
