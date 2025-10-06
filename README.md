@@ -36,7 +36,9 @@ what it is doing. Note - GOA will not delete your emails it only moves it to fol
 The benefit of GOA is your InBox is immediately cleaned up. You do not have all the
 jumk email at the top of your InBox from people you don't know. You will have to
 starting adding missing people to your contacts to make this work better, but GOA
-organizes to help you find who is missing.
+organizes to help you find who is missing. You also need to keep running GOA
+batches for a while if you have thousands of messages in your InBox, but the
+most recent junk emails are removed immediately.
 
 ## Moving messages to Other Folders
 You can also configure GOA to send messages from certain people into seperate folders.
