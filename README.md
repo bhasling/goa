@@ -23,7 +23,8 @@ InBox when you check your email.
 
 When GOA runs is reads some number of the most recent emails in your InBox. The number
 of Emails it runs is the batch size. By default this is 20 emails. You can configure
-by sending yourself an email with the subject line.
+by sending yourself an email with the subject line. This command will be handled
+the next time GOA runs (it is not handled immmediately).
 
     GOA set batch 100
 
