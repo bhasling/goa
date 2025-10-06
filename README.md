@@ -21,41 +21,42 @@ InBox when you check your email.
 
 ## Batch Size
 
-When GOA runs is reads some number of the most recent emails in your InBox. The number
+When GOA executes it reads some number of the most recent emails in your InBox. The number
 of Emails it reads is the batch size. By default this is 20 emails. You can configure
-by sending yourself an email with the subject line. This command will be handled
+by sending yourself an email with a command in the subject line. This command will be handled
 the next time GOA runs (it is not handled immmediately).
 
     GOA set batch 100
 
 It a good idea when you start using GOA to test with a small batch size so you can understand
-what it is doing. Note - GOA will not delete your emails it only moves it to folders (labels it).
+what it is doing. Note - GOA will not delete your emails, it only moves it to folders (labels it).
 
 ## Benefit
 
 The benefit of GOA is your InBox is immediately cleaned up. You do not have all the
-jumk email at the top of your InBox from people you don't know. You will have to
+junk email at the top of your InBox from people you don't know. You will have to
 starting adding missing people to your contacts to make this work better, but GOA
 organizes to help you find who is missing. You also need to keep running GOA
 batches for a while if you have thousands of messages in your InBox, but the
-most recent junk emails are removed immediately.
+most recent junk emails are removed immediately. Eventually over time your InBox
+will be fully cleaned.
 
 ## Moving messages to Other Folders
 You can also configure GOA to send messages from certain people into seperate folders.
 This is useful if you interact with different groups of people and get lots of emails from
-each group. This organizes all the email from the different people in the group to one place.
+each group. This organizes all the email from the people in a group to one place.
 
-You configure this by added a label to someone in your contact list and then telling
+You configure this by added a label to some people in your contact list and then telling
 GOA that you want to move all message from people with that label to a folder with that name.
 
 You configure GOA by emailing yourself a line with the subject in this form:
 
-    GOA add folder <mylabel>
+    GOA add folder <mylabel1> <mylabel2>
 
 This tells GOA to move all messages from people who have this label in your contacts to a
 email folder of the same name. If you change your mind you can send GOA another email:
 
-    GOA remove folder <mylabel>
+    GOA remove folder <mylabel1> <mylabel2>
 
 Then GOA will stop moving messages for that label. You can keep the label in the contacts.
 
@@ -87,11 +88,15 @@ However, Gmail does not support folders, it only support labels. However, it tur
 the two look very much the same and you can think of these as folders if you want.
 
 There are differences and the differences are what often confuse people.
-* A message may have multiple labels. That means it looks like it is in multiple folders, but it still one message.
-* A label can have many message. (Not really, it is really the meessage that has label). However in the UI you can click on a label and see all its messages so it looks like a folder. 
+* A message may have multiple labels. That means it can look like it is in multiple folders, but it still one message.
+* A label can have many message. (Not really, it is really the meessage that has label not the folder that has messages). However in the UI you can click on a label and see all its messages so it looks like a folder. 
 In Gmail when you open a message you can see all the labels that message has and click a checkbox to remove a message from that label.
 
 If you move a message to trash you are just labeling it to with the trash label. It is not removed until you delete it.
 
+# Messages vs Threads
 
-    
+Gmail has the concept of a thread. A thread is a list of email messages that have the same subject text.
+A thread is created when someone replies to an email or sends a new message with the same subject line as a previous email.
+Normally, in labels are applied to threads and viewed in the GMail UI as threads.
+   

@@ -1,8 +1,9 @@
 /******************************************
- * GOA - GMAIL Origanize App.
+ * GOA - GMAIL Organize App.
  * 
  * An application to organize your Gmail Inbox and folders.
- * Source code is in Google Drive: https://drive.google.com
+ * Install into a google app project folder which is stored
+ * in your Google Drive: https://drive.google.com
  * ****************************************/
 
 /** Main function to organize emails. */
@@ -21,7 +22,7 @@ function organizeEmail() {
 
     // configuration options
     folderLabels: [],
-    batchSize: 20,
+    batchSize: 100,
     wakeWord: "goa",
     unknownSendersFolder: "UnknownSenders",
 
@@ -50,40 +51,50 @@ function organizeEmail() {
 function readInbox(state) {
   var returnCode = 0;
 
-  // Loop to restart reading the emails after finding a GOA action email
-  for (var j = 0; j < 2; j++) {
-    returnCode = 0;
+  try {
+    // Loop to restart reading the emails after finding a GOA action email
+    for (var j = 0; j < 2; j++) {
+      returnCode = 0;
 
-    // Read the persisted properties of the GOA application from Google properties
-    readUserProperties(state);
+      // Read the persisted properties of the GOA application from Google properties
+      readUserProperties(state);
 
-    // Get the most recent threads from the InBox for a batch to process
-    var threads = GmailApp.getInboxThreads(0, state.batchSize);
+      // Get the most recent threads from the InBox for a batch to process
+      var threads = GmailApp.getInboxThreads(0, state.batchSize);
 
-    // Loop through each thread in the batch
-    for (var i = 0; i < threads.length; i++) {
-      state.stats.numberOfEmailThreadsProcessed = state.stats.numberOfEmailThreadsProcessed + 1;
-      // Got an email address thread (which may have several messages)
-      var emailThread = threads[i];
+      // Loop through each thread in the batch
+      for (var i = 0; i < threads.length; i++) {
+        state.stats.numberOfEmailThreadsProcessed = state.stats.numberOfEmailThreadsProcessed + 1;
+        // Got an email address thread (which may have several messages)
+        var emailThread = threads[i];
 
-      // Process all the messages in the thread
-      var messagesInThread = emailThread.getMessages();
-      for (var j = 0; j < messagesInThread.length; j++) {
-        var msg = messagesInThread[j];
-        returnCode = processMessage(state, emailThread, msg);
+        // Process all the messages in the thread
+        var messagesInThread = emailThread.getMessages();
+        for (var j = 0; j < messagesInThread.length; j++) {
+          var msg = messagesInThread[j];
+          returnCode = processMessage(state, emailThread, msg);
 
-        // Break from the message loop if we found a GOA action
+          // Break from the message loop if we found a GOA action
+          if (returnCode) {
+            break;
+          }
+        }
+
+        // Break from the thread loop if we found a GOA action
         if (returnCode) {
           break;
         }
       }
 
-      // Break from the thread loop if we found a GOA action
-      if (returnCode) {
-        break;
-      }
     }
-
+  } catch (error) {
+    var errorMessage = "An error ocurred when running GOA.\n";
+    if (error.message) {
+      errorMessage = errorMessage + `<p>${error.message}</p>`;
+    } else {
+      errorMessage = errorMessage + `<p>${error}</p>`;
+    }
+    sendErrorEmail(state, errorMessage);
   }
 }
 
@@ -170,7 +181,7 @@ function classifyEmailContact(state, emailThread, msg, emailAddress) {
     //  If the email addess is in the users contact list find groups of that contact
     groups = getContactGroups(state, contactInfoList);
 
-    // Look and the GOA configured folder labels to see if user is in that group
+    // Look at the GOA configured folder labels to see if user is in that group
     for (var i = 0; i < state.folderLabels.length; i++) {
       var folderLabel = state.folderLabels[i];
       if (groups.indexOf(folderLabel) >= 0) {
@@ -212,6 +223,8 @@ function classifyEmailContact(state, emailThread, msg, emailAddress) {
  * If it is not in that contact list look in the OtherContacts list.
  * The OtherContacts list is an old obsolete version of Google Contacts
  * but this may still contain some old contacts that are still valid.
+ * 
+ * Return a list of contacts or null if the emailAddress is not associated with a contact.
  */
 function getEmailAddressContactInfo(emailAddress) {
   // Get a list of contacts associated with the emailAddress
@@ -231,7 +244,7 @@ function getEmailAddressContactInfo(emailAddress) {
     });
     // If we got a response set it to null if it is empty or change it a list
     if (response && response.person) {
-      result = [responce.person];
+      result = [response.person];
     }
   }
   return result;
@@ -239,7 +252,7 @@ function getEmailAddressContactInfo(emailAddress) {
 }
 
 /** 
- * Get the list folder label names for any label group in the users contactInfo list.
+ * Get the list of folder label names for any label group in the users contactInfo list.
  * 
  * The contactInfoList is a list that comes from the Google Contact app.
  * However this just contains membership IDs. These are looked up to get the label name.
@@ -260,10 +273,20 @@ function getContactGroups(state, contactInfoList) {
   return result;
 }
 
-/** Create a map in state from a contact label ID to the name of the contract label. 
+/**  
+ * Read user properties
  * 
+ * This create a map in state from a contact label ID to the name of the contact label.
  * This returns a map of contact ID to a contact label name.
  * It looks this up using the Google People.ContactGroups service.
+ * 
+ * This looks up the saved configured folder labels from PropertiesService.
+ * 
+ * This looks up previous statistics from PropertiesService.
+ * 
+ * This looks up saved batchSize from Properties Service.
+ * 
+ * This gets the emailAddress of the user (you) from Google profile.
  */
 function readUserProperties(state) {
   state.contactLabelMap = {};
@@ -298,13 +321,14 @@ function readUserProperties(state) {
   state["myemail"] = Session.getActiveUser().getEmail();
 }
 
-/** Replaces the list of folder labels in the Google configuration. */
+/** Replaces the list of folder labels in the Google Properties configuration. */
 function initializeFolderLabels(labels) {
   const userProps = PropertiesService.getUserProperties();
   userProps.setProperty("gmail_apps.folder_labels", JSON.stringify(labels));
 }
 
-/** Find and parse a Goa action message in an email message.
+/** 
+ * Find and parse a Goa action message in an email message.
  * 
  * This looka at the subject of the emailThread to see if it starts
  * with the wake up word and then parses the action specified in the
@@ -330,19 +354,27 @@ function parseGoaMessage(state, subject, emailThread, msg) {
         if (parts[0].toLowerCase() == state.wakeWord.toLowerCase()) {
           if (["add", "enable", "insert"].includes(parts[1].toLowerCase())) {
             if (["folder", "label"].includes(parts[2].toLowerCase())) {
-              var folder = parts[3];
-              if (!state.folderLabels.includes(folder)) {
-                state.folderLabels.push(folder);
-                initializeFolderLabels(state.folderLabels);
-                emailThread.moveToTrash();
+              var i = 3;
+              while (i < parts.length) {
+                var folder = parts[i];
+                if (!state.folderLabels.includes(folder)) {
+                  state.folderLabels.push(folder);
+                }
+                i = i + 1;
               }
+              initializeFolderLabels(state.folderLabels);
+              emailThread.moveToTrash();
               state.stats.numberOfActionMessages += 1;
               return -1;
             }
           } else if (["delete", "remove", "disable"].includes(parts[1].toLowerCase())) {
             if (["folder", "label"].includes(parts[2].toLowerCase())) {
-              var folder = parts[3];
-              state.folderLabels = state.folderLabels.filter(item => item !== folder);
+              var i = 3;
+              while (i < parts.length) {
+                var folder = parts[i];
+                state.folderLabels = state.folderLabels.filter(item => item !== folder);
+                i = i + 1;
+              }
               initializeFolderLabels(state.folderLabels);
               emailThread.moveToTrash();
               state.stats.numberOfActionMessages += 1;
@@ -432,9 +464,17 @@ function reportResults(state) {
   Logger.log(htmlBody);
 }
 
+/** Send an email error message back to user. */
+function sendErrorEmail(state, errorMessage) {
+  var subject = "GOA Error";
+  var htmlBody = errorMessage;
+  GmailApp.sendEmail(state.myemail, subject, "", { htmlBody: htmlBody });
+}
+
 /** Debug function (not used) to check the contact information about an email address. */
 function debugContact() {
   var emailAddress = "tshannontopspin@verizon.net";
   var contactInfoList = getEmailAddressContactInfo(emailAddress);
   Logger.log(contactInfoList);
 }
+
