@@ -45,7 +45,7 @@ You can also configure GOA to send messages from certain people into seperate fo
 This is useful if you interact with different groups of people and get lots of emails from
 each group. This organizes all the email from the different people in the group to one place.
 
-You configure this by added a labels to people in your contact list and then telling
+You configure this by added a label to someone in your contact list and then telling
 GOA that you want to move all message from people with that label to a folder with that name.
 
 You configure GOA by emailing yourself a line with the subject in this form:
