@@ -52,12 +52,12 @@ You configure GOA by emailing yourself a line with the subject in this form:
 
     GOA add folder <mylabel>
 
-This tells GOA to move all messages from people who have this label in your contact of that person.
-If you change your mind you can send GOA another email:
+This tells GOA to move all messages from people who have this label in your contacts to a
+email folder of the same name. If you change your mind you can send GOA another email:
 
     GOA remove folder <mylabel>
 
-Then GOA will stop moving message for that label. You can keep the label in the contacts.
+Then GOA will stop moving messages for that label. You can keep the label in the contacts.
 
 ## Missing Contacts
 
@@ -66,12 +66,12 @@ in your contact list. If this happens GOA will move messages from that person to
 UnknownSenders folder in Gmail.
 
 GOA will never remove this email (it only moves it from your InBox to your UnknownSenders folder).
-You you use Gmail to Click the UnknownSenders folder to you will see all emails from UnknownSenders
+If you use Gmail to Click the UnknownSenders folder you will see all emails from UnknownSenders
 sorted with the most recent emails on top (always).
 
 Periodically scan senders in your UknownSenders list to find someone who you think is important.
 Most of the emails in this list will be junk so important people will probably stand out.
-Open the message. Click the name of the From and Click "Add to Contacts". 
+Open the message. Click the name of the sender and click "Add to Contacts". 
 
 Click the checkbox next to the email. In the top of the window click the move button and
 move the message to InBox.
