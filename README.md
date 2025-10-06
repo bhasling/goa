@@ -87,7 +87,7 @@ However, Gmail does not support folders, it only support labels. However, it tur
 the two look very much the same and you can think of these as folders if you want.
 
 There are differences and the differences are what often confuse people.
-* A message may have multiple labels (it looks like it is in mulpile folders), but it still one message.
+* A message may have multiple labels. That means it looks like it is in multiple folders, but it still one message.
 * A label can have many message. (Not really, it is really the meessage that has label). However in the UI you can click on a label and see all its messages so it looks like a folder. 
 In Gmail when you open a message you can see all the labels that message has and click a checkbox to remove a message from that label.
 
