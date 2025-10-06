@@ -2,7 +2,7 @@
 
 This is a Google app to help someone organize their own personal GMail InBox.
 
-You install it by adding the source code file in src/goa.ds to your Google apps project directory.
+You install it by adding the source code file in src/goa.gs to your Google apps project directory.
 Then you can run it manually or have Google trigger it peridically (once or several times a day).
 
 The app reads your GMail Inbox and looks up each email in your Google contacts. If if the email
