@@ -22,7 +22,7 @@ InBox when you check your email.
 ## Batch Size
 
 When GOA runs is reads some number of the most recent emails in your InBox. The number
-of Emails it runs is the batch size. By default this is 20 emails. You can configure
+of Emails it reads is the batch size. By default this is 20 emails. You can configure
 by sending yourself an email with the subject line. This command will be handled
 the next time GOA runs (it is not handled immmediately).
 
@@ -79,5 +79,19 @@ move the message to InBox.
 Go back to your InBox and handle the message. The next GOA run will not make this mistake
 again for that person. Eventually you will have everyone important in your Contacts list.
 This is a good idea anyway.
+
+# Labels vs Folders
+
+Most people think GMail has folders. They think you can organize email into folders.
+However, Gmail does not support folders, it only support labels. However, it turns out
+the two look very much the same and you can think of these as folders if you want.
+
+There are differences and the differences are what often confuse people.
+* A message may have multiple labels (it looks like it is in mulpile folders), but it still one message.
+* A label can have many message. (Not really, it is really the meessage that has label). However in the UI you can click on a label and see all its messages so it looks like a folder. 
+In Gmail when you open a message you can see all the labels that message has and click a checkbox to remove a message from that label.
+
+If you move a message to trash you are just labeling it to with the trash label. It is not removed until you delete it.
+
 
     
