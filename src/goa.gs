@@ -21,7 +21,7 @@ function organizeEmail() {
 
     // configuration options
     folderLabels: [],
-    batchSize: 100,
+    batchSize: 20,
     wakeWord: "goa",
     unknownSendersFolder: "UnknownSenders",
 
