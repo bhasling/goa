@@ -70,19 +70,22 @@ function readInbox(state) {
 
         // Process all the messages in the thread
         var messagesInThread = emailThread.getMessages();
+        var isGoaReportMessage = false;
+        var firstMessage = null;
         for (var j = 0; j < messagesInThread.length; j++) {
           var msg = messagesInThread[j];
-          returnCode = processMessage(state, emailThread, msg);
-
-          // Break from the message loop if we found a GOA action
-          if (returnCode) {
-            break;
+          if (j == 0) firstMessage = msg;
+          var subject = msg.getSubject();
+          var returnCode = parseGoaMessage(state, subject, emailThread, msg);
+          if (returnCode < 0) {
+            return returnCode;
+          } else if (returnCode > 0) {
+            isGoaReportMessage = true;
           }
         }
-
-        // Break from the thread loop if we found a GOA action
-        if (returnCode) {
-          break;
+        if (! isGoaReportMessage) {
+          // None of the message are Goa action messages. So process the thread
+          processMessage(state, emailThread, firstMessage);
         }
       }
 
@@ -108,13 +111,8 @@ function readInbox(state) {
 function processMessage(state, emailThread, msg) {
   state.stats.numberEmailsProcessed = state.stats.numberEmailsProcessed + 1;
 
-  // Check if this message is a GOA action message
+  // get the sender from the from part of the message
   var from = msg.getFrom();
-  var subject = msg.getSubject();
-  var returnCode = parseGoaMessage(state, subject, emailThread, msg);
-  if (returnCode) {
-    return returnCode;
-  }
 
   // Parse out the email address string from the "from" of message.
   var emailAddress = null;
@@ -124,9 +122,10 @@ function processMessage(state, emailThread, msg) {
   } else {
     emailAddress = from;
   }
-
+  Logger.log(`Parsed emailAddress to from ${emailAddress}`);
   // Find a GOA configured folder label that is label in the contacts of the email Message
   var folderLabel = state.emailAddressToFolderMap[emailAddress];
+  Logger.log(`Folder label from cache for ${emailAddress} is ${folderLabel}`);
 
   // Classify the message based on the email address contacts
   // Update the statistics of the email and move the email
@@ -158,23 +157,9 @@ function processMessage(state, emailThread, msg) {
   return 0;
 }
 
-/** Apply a folderLabel to the email thread and remove from the InBox. */
-function applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel) {
-  var label = GmailApp.getUserLabelByName(folderLabel) || GmailApp.createLabel(folderLabel);
-  var existingLabels = emailThread.getLabels();
-  var alreadyLabeled = existingLabels.some(function (l) {
-    return l.getName() === label.getName();
-  });
-  if (!alreadyLabeled) {
-    emailThread.addLabel(label);
-    emailThread.moveToArchive();
-  } else {
-    emailThread.moveToArchive();
-  }
-}
-
 /** Classify the emailAddress by the contact information about the emailAddress and store classification in state. */
 function classifyEmailContact(state, emailThread, msg, emailAddress) {
+  Logger.log(`Classify thread from ${emailAddress}`);
   // Get the contact information about the email address
   var contactInfoList = getEmailAddressContactInfo(emailAddress);
   if (contactInfoList) {
@@ -185,6 +170,7 @@ function classifyEmailContact(state, emailThread, msg, emailAddress) {
     for (var i = 0; i < state.folderLabels.length; i++) {
       var folderLabel = state.folderLabels[i];
       if (groups.indexOf(folderLabel) >= 0) {
+        Logger.log(`Folder label classified for ${emailAddress} is ${folderLabel}`);
         // the contact of the email address is in this GOA folder group
         // Save that this email address is in this folder group
         state.folderEmailAddressesMap[emailAddress] = folderLabel;
@@ -213,6 +199,23 @@ function classifyEmailContact(state, emailThread, msg, emailAddress) {
     state.stats.numberNoContactMessages = state.stats.numberNoContactMessages + 1;
     // Move this email thread to the unknown senders folder
     applyLabelToEmailMessage(state, emailThread, msg, emailAddress, state.unknownSendersFolder);
+  }
+}
+
+/** Apply a folderLabel to the email thread and remove from the InBox. */
+function applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel) {
+  var label = GmailApp.getUserLabelByName(folderLabel) || GmailApp.createLabel(folderLabel);
+  var existingLabels = emailThread.getLabels();
+  var alreadyLabeled = existingLabels.some(function (l) {
+    return l.getName() === label.getName();
+  });
+  if (!alreadyLabeled) {
+    emailThread.addLabel(label);
+    emailThread.moveToArchive();
+  } else {
+    // Add the label anyway because there is a new message for the label
+    emailThread.addLabel(label);
+    emailThread.moveToArchive();
   }
 }
 
@@ -346,7 +349,7 @@ function parseGoaMessage(state, subject, emailThread, msg) {
       state.statusMessageNotRead = true;
     }
     emailThread.moveToTrash();
-    return 0;
+    return 1;
   } else {
     if (subject.toLowerCase().includes(state.wakeWord.toLowerCase())) {
       var parts = subject.split(" ");
@@ -366,6 +369,9 @@ function parseGoaMessage(state, subject, emailThread, msg) {
               emailThread.moveToTrash();
               state.stats.numberOfActionMessages += 1;
               return -1;
+            } else {
+              sendErrorEmail(state, "Expected folder or label after add or insert");
+              return -1;
             }
           } else if (["delete", "remove", "disable"].includes(parts[1].toLowerCase())) {
             if (["folder", "label"].includes(parts[2].toLowerCase())) {
@@ -379,6 +385,9 @@ function parseGoaMessage(state, subject, emailThread, msg) {
               emailThread.moveToTrash();
               state.stats.numberOfActionMessages += 1;
               return -1;
+            } else {
+              sendErrorEmail(state, "Expected folder or label after delete or remove.");
+              return -1;
             }
           } else if (["set", "assign"].includes(parts[1].toLowerCase())) {
             if (["batch", "size"].includes(parts[2].toLowerCase())) {
@@ -388,6 +397,9 @@ function parseGoaMessage(state, subject, emailThread, msg) {
               userProps.setProperty("gmail_apps.batchSize", batchSize.toString());
               emailThread.moveToTrash();
               state.stats.numberOfActionMessages += 1;
+              return -1;
+            } else {
+              sendErrorEmail(state, "Expected batch or size after set.");
               return -1;
             }
           }
