@@ -29,9 +29,12 @@ function organizeEmail() {
     // statistics
     stats: {
       numberOfMessagesWithUnknownSender: 0,
+      numberOfRecentMessagesWithUnknownSender: 0,
       numberNoContactMessages: 0,
       numberContactMessages: 0,
+      numberRecentContactMessages: 0,
       numberFolderMessagesMap: {},
+      numberFolderRecentMessagesMap: {},
       numberEmailsProcessed: 0,
       numberOfEmailThreadsProcessed: 0,
       numberOfActionMessages: 0,
@@ -114,6 +117,8 @@ function processMessage(state, emailThread, msg) {
   // get the sender from the from part of the message
   var from = msg.getFrom();
 
+  var messageIsRecent = isMessageRecent(msg);
+
   // Parse out the email address string from the "from" of message.
   var emailAddress = null;
   var match = from.match(/<([^>]+)>/);
@@ -122,10 +127,10 @@ function processMessage(state, emailThread, msg) {
   } else {
     emailAddress = from;
   }
-  Logger.log(`Parsed emailAddress to from ${emailAddress}`);
+  //Logger.log(`Parsed emailAddress to from ${emailAddress}`);
   // Find a GOA configured folder label that is label in the contacts of the email Message
   var folderLabel = state.emailAddressToFolderMap[emailAddress];
-  Logger.log(`Folder label from cache for ${emailAddress} is ${folderLabel}`);
+  //Logger.log(`Folder label from cache for ${emailAddress} is ${folderLabel}`);
 
   // Classify the message based on the email address contacts
   // Update the statistics of the email and move the email
@@ -134,32 +139,28 @@ function processMessage(state, emailThread, msg) {
   if (folderLabel) {
     // Email Address contact is associated with a folderLabel
     applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
-    var count = state.stats.numberFolderMessagesMap[folderLabel];
-    count = count ? count : 0;
-    count = count + 1;
-    state.stats.numberFolderMessagesMap[folderLabel] = count;
-
+    incrementFolderMessageCount(state, messageIsRecent, folderLabel);
     //Logger.log(`${emailAddress} is in folder ${folderlabel}`);
   } else if (state.goodEmailAddresses.indexOf(emailAddress) >= 0) {
     // Email Address contact is already determined to be good
-    state.stats.numberContactMessages = state.stats.numberContactMessages + 1;
+    incrementContactMessageCount(state, messageIsRecent);
     //Logger.log(`${emailAddress} is in contacts`);
   } else if (state.badEmailAddresses.indexOf(emailAddress) >= 0) {
     // Email Address contact is already determined to be bad
-    state.stats.numberNoContactMessages = state.stats.numberNoContactMessages + 1;
+    incrementUnknownMessageCount(state, messageIsRecent);
     applyLabelToEmailMessage(state, emailThread, msg, emailAddress, state.unknownSendersFolder);
     //Logger.log(`${emailAddress} is not in contacts`);
   } else {
     // Email address contact person has not been seen yet
-    classifyEmailContact(state, emailThread, msg, emailAddress);
+    classifyEmailContact(state, emailThread, msg, emailAddress, messageIsRecent);
     //Logger.log(`${emailAddress} has no sender email`);
   }
   return 0;
 }
 
 /** Classify the emailAddress by the contact information about the emailAddress and store classification in state. */
-function classifyEmailContact(state, emailThread, msg, emailAddress) {
-  Logger.log(`Classify thread from ${emailAddress}`);
+function classifyEmailContact(state, emailThread, msg, emailAddress, messageIsRecent) {
+  // Logger.log(`Classify thread from ${emailAddress}`);
   // Get the contact information about the email address
   var contactInfoList = getEmailAddressContactInfo(emailAddress);
   if (contactInfoList) {
@@ -170,16 +171,13 @@ function classifyEmailContact(state, emailThread, msg, emailAddress) {
     for (var i = 0; i < state.folderLabels.length; i++) {
       var folderLabel = state.folderLabels[i];
       if (groups.indexOf(folderLabel) >= 0) {
-        Logger.log(`Folder label classified for ${emailAddress} is ${folderLabel}`);
+        // Logger.log(`Folder label classified for ${emailAddress} is ${folderLabel}`);
         // the contact of the email address is in this GOA folder group
         // Save that this email address is in this folder group
         state.folderEmailAddressesMap[emailAddress] = folderLabel;
 
         // Move the email to the folder group and update the GOA statistics
-        var count = state.stats.numberFolderMessagesMap[folderLabel];
-        count = count ? count : 0;
-        count = count + 1;
-        state.stats.numberFolderMessagesMap[folderLabel] = count;
+        incrementFolderMessageCount(state, messageIsRecent, folderLabel);
         applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
 
         // Return because we handled this email message
@@ -190,13 +188,13 @@ function classifyEmailContact(state, emailThread, msg, emailAddress) {
     // If the contact is not in any of the folder groups it is considered good
     // because this is an email in the contact list, just not moved to a folder
     state.goodEmailAddresses.push(emailAddress);
-    state.stats.numberContactMessages = state.stats.numberContactMessages + 1;
+    incrementContactMessageCount(state, messageIsRecent);
 
   } else {
     // The email is not associated with a contact
     // Save the email address as not having a contact and update statistics
     state.badEmailAddresses.push(emailAddress);
-    state.stats.numberNoContactMessages = state.stats.numberNoContactMessages + 1;
+    incrementUnknownMessageCount(state, messageIsRecent);
     // Move this email thread to the unknown senders folder
     applyLabelToEmailMessage(state, emailThread, msg, emailAddress, state.unknownSendersFolder);
   }
@@ -330,6 +328,59 @@ function initializeFolderLabels(labels) {
   userProps.setProperty("gmail_apps.folder_labels", JSON.stringify(labels));
 }
 
+/**
+ * Increment the folder message Count for the folder label.
+ * 
+ */
+function incrementFolderMessageCount(state, messageIsRecent, folderLabel) {
+      if (messageIsRecent) {
+        var count = state.stats.numberFolderRecentMessagesMap[folderLabel];
+        count = count ? count : 0;
+        count = count + 1;
+        state.stats.numberFolderRecentMessagesMap[folderLabel] = count;
+    } else {
+        var count = state.stats.numberFolderMessagesMap[folderLabel];
+        count = count ? count : 0;
+        count = count + 1;
+        state.stats.numberFolderMessagesMap[folderLabel] = count;
+    }
+}
+
+function incrementContactMessageCount(state, messageIsRecent) {
+    if (messageIsRecent) {
+      state.stats.numberRecentContactMessages = state.stats.numberRecentContactMessages + 1;
+    } else {
+      state.stats.numberContactMessages = state.stats.numberContactMessages + 1;
+    }
+}
+
+function incrementUnknownMessageCount(state, messageIsRecent) {
+    if (messageIsRecent) {
+      state.stats.numberNoContactMessages = state.stats.numberNoContactMessages + 1;
+    } else {
+      state.stats.numberNoContactMessages = state.stats.numberNoContactMessages + 1;
+    }
+}
+/**
+ * Check if an email message is a recent date.
+ * A recent date is if the message sent date is with 60 days.
+ * Returns true, if the message is recent otherwise false.
+ */
+function isMessageRecent(msg) {
+  var result = false;
+  if (msg) {
+    var sentDate = msg.getDate();
+    var today = new Date();
+    var sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(today.getDate() - 60);
+    if (sentDate > sixtyDaysAgo) {
+      // date is within 60 days agao
+      result = true;
+    }
+  }
+  return result;
+}
+
 /** 
  * Find and parse a Goa action message in an email message.
  * 
@@ -349,6 +400,7 @@ function parseGoaMessage(state, subject, emailThread, msg) {
       state.statusMessageNotRead = true;
     }
     emailThread.moveToTrash();
+    state.stats.numberOfActionMessages += 1;
     return 1;
   } else {
     if (subject.toLowerCase().includes(state.wakeWord.toLowerCase())) {
@@ -419,6 +471,7 @@ function saveStatistics(state) {
 function addPreviousStats(state) {
   if (state.previousStatistics) {
     state.stats.numberOfMessagesWithUnknownSender += state.previousStatistics.numberOfMessagesWithUnknownSender;
+    state.stats.numberOfRecentMessagesWithUnknownSender += state.previousStatistics.numberOfRecentMessagesWithUnknownSender;
     state.stats.numberNoContactMessages += state.previousStatistics.numberNoContactMessages;
     state.stats.numberEmailsProcessed += state.previousStatistics.numberEmailsProcessed;
     state.stats.numberOfEmailThreadsProcessed += state.previousStatistics.numberOfEmailThreadsProcessed;
@@ -432,6 +485,17 @@ function addPreviousStats(state) {
         newCount = newCount ? newCount : 0;
         newCount += oldCount;
         state.stats.numberFolderMessagesMap[key] = newCount;
+      }
+    }
+    if (state.previousStatistics.numberRecentFolderMessagesMap) {
+      var keys = Object.keys(state.previousStatistics.numberRecentFolderMessagesMap);
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var oldCount = state.previousStatistics.numberRecentFolderMessagesMap[key];
+        var newCount = state.stats.numberRecentFolderMessagesMap[key];
+        newCount = newCount ? newCount : 0;
+        newCount += oldCount;
+        state.stats.numberRecentFolderMessagesMap[key] = newCount;
       }
     }
   }
@@ -449,18 +513,43 @@ function reportResults(state) {
   }
   saveStatistics(state);
 
-  var htmlBody = `The organizeEmail Google App in your account read ${state.stats.numberEmailsProcessed} email messsages (${state.stats.numberOfEmailThreadsProcessed} threads).\n`;
+  var htmlBody = `The organizeEmail Google App in your account read ${state.stats.numberOfEmailThreadsProcessed} email threads.\n`;
   htmlBody = htmlBody + "<ul>\n";
-  htmlBody = htmlBody + `<li>${state.stats.numberContactMessages} messages from your contacts (left in InBox).</li>\n`
-  htmlBody = htmlBody + `<li>${state.stats.numberNoContactMessages} messages from no contact senders (moved to ${state.unknownSendersFolder} folder).</li>\n`
-  htmlBody = htmlBody + `<li>${state.stats.numberOfActionMessages} action messages.</li>\n`
-  htmlBody = htmlBody + `<li>${state.stats.numberOfMessagesWithUnknownSender} messages from senders with no email address (moved to ${state.unknownSendersFolder} folder).</li>\n`;
+  if (state.stats.numberRecentContactMessages > 0) {
+    htmlBody = htmlBody + `<li>${state.stats.numberRecentContactMessages} recent messages from your contacts (left in InBox).</li>\n`
+  }
+  if (state.stats.numberOfRecentMessagesWithUnknownSender > 0) {
+    htmlBody = htmlBody + `<li>${state.stats.numberOfRecentMessagesWithUnknownSender} recent messages from senders with no email address (moved to ${state.unknownSendersFolder} folder).</li>\n`;
+  }
+  const recentKeys = Object.keys(state.stats.numberFolderRecentMessagesMap);
+  for (var i = 0; i < recentKeys.length; i++) {
+    var key = recentKeys[i];
+    var count = state.stats.numberFolderRecentMessagesMap[key]
+    htmlBody = htmlBody + `<li>${count} recent messages moved to ${key} folder.</li>\n`
+  }
+  if (state.stats.numberOfActionMessages > 0) {
+    htmlBody = htmlBody + `<li>${state.stats.numberOfActionMessages} action messages.</li>\n`
+  }
+  if (state.stats.numberNoContactMessages > 0) {
+    htmlBody = htmlBody + `<li>${state.stats.numberNoContactMessages} old messages from no contact senders (moved to ${state.unknownSendersFolder} folder).</li>\n`
+  }
+  if (state.stats.numberOfMessagesWithUnknownSender > 0) {
+    htmlBody = htmlBody + `<li>${state.stats.numberOfMessagesWithUnknownSender} old messages from senders with no email address (moved to ${state.unknownSendersFolder} folder).</li>\n`;
+  }
+
+
+  if (state.stats.numberContactMessages > 0) {
+    htmlBody = htmlBody + `<li>${state.stats.numberContactMessages} old messages from your contacts (left in InBox).</li>\n`
+  }
+
   const keys = Object.keys(state.stats.numberFolderMessagesMap);
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
     var count = state.stats.numberFolderMessagesMap[key]
-    htmlBody = htmlBody + `<li>${count} messages moved to ${key} folder.</li>\n`
+    htmlBody = htmlBody + `<li>${count} old messages moved to ${key} folder.</li>\n`
   }
+
+  // Display instructions
   var folderLabelsList = JSON.stringify(state.folderLabels);
   var wake = state.wakeWord.toUpperCase();
   htmlBody = htmlBody + "<p></p>";
