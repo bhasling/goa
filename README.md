@@ -5,7 +5,7 @@ This is a Google app to help someone organize their own personal GMail InBox.
 You install it by adding the source code file in src/goa.gs to your Google apps project directory.
 Then you can run it manually or have Google trigger it peridically (once or several times a day).
 
-The app reads your GMail Inbox and looks up each email in your Google contacts. If if the email
+The app reads your GMail Inbox and looks up each email in your Google contacts. If the email
 is in your contacts it keeps the message in your InBox otherwise it labels the message thread
 with the label "UnknownSenders" and removes the message from your InBox.
 
@@ -89,7 +89,7 @@ the two look very much the same and you can think of these as folders if you wan
 
 There are differences and the differences are what often confuse people.
 * A message may have multiple labels. That means it can look like it is in multiple folders, but it still one message.
-* A label can have many messages. (Not really - it is really the meessage that has label not the folder that has messages). However in the UI you can click on a label and see all its messages so it looks like a folder. 
+* A label can have many messages. (Not really - it is really the email thread and its messages that has label not the folder that has messages). However in the UI you can click on a label and see all its messages so it looks like a folder. 
 In Gmail when you open a message you can see all the labels of that message and click a checkbox to remove a label from that message.
 
 If you move a message to trash you are just labeling it to with the trash label. It is not removed until you delete it.
@@ -98,5 +98,18 @@ If you move a message to trash you are just labeling it to with the trash label.
 
 Gmail has the concept of a thread. A thread is a list of email messages that have the same subject text.
 A thread is created when someone replies to an email or sends a new message with the same subject line as a previous email.
-Normally labels are applied to threads and viewed in the GMail UI as threads.
+
+You actually cannot apply a label to a message. You can only apply it to a thread.
+When you apply a label to a thread then internally GMail marks all messages in the thread with the label (at the time of applying).
+
+However, if another reply happens after a label is applied the new message does not have that label.
+If you re-apply the same label to the thread then again all the message in the thread (including the new one) have the label.
+
+This can be confusing if you think your thread has a label, but you do not see ALL the message of the thread when you search by label.
+
+For GOA processing this means if a new reply is made to a thread with a lbel, then  this message should exist in your
+InBox without the label until GOA runs again. When GOA runs again it applies labels to the thread again and the new reply should get labelled as expected.
+
+This is a long way of saying email threads can be confusing.
+
    
