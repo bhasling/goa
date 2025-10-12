@@ -444,6 +444,10 @@ function parseGoaMessage(state, subject, emailThread, msg) {
           } else if (["set", "assign"].includes(parts[1].toLowerCase())) {
             if (["batch", "size"].includes(parts[2].toLowerCase())) {
               var batchSize = parseInt(parts[3]);
+              if (batchSize > 100) {
+                sendErrorEmail(state, "Batch size cannot be greater than 100. This is slow and can overflow Google limits.");
+                return -1;
+              }
               state.batchSize = batchSize;
               const userProps = PropertiesService.getUserProperties();
               userProps.setProperty("gmail_apps.batchSize", batchSize.toString());
@@ -578,4 +582,3 @@ function debugContact() {
   var contactInfoList = getEmailAddressContactInfo(emailAddress);
   Logger.log(contactInfoList);
 }
-
