@@ -138,9 +138,15 @@ function processMessage(state, emailThread, msg) {
 
   if (folderLabel) {
     // Email Address contact is associated with a folderLabel
-    applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
-    incrementFolderMessageCount(state, messageIsRecent, folderLabel);
-    //Logger.log(`${emailAddress} is in folder ${folderlabel}`);
+    if (msg.isUnread()) {
+      // Message is unread, but is a contact so leave in InBox
+      incrementContactMessageCount(state, messageIsRecent);
+    } else {
+      // Message has been read so move from InBox to folderLabel
+      applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
+      incrementFolderMessageCount(state, messageIsRecent, folderLabel);
+      //Logger.log(`${emailAddress} is in folder ${folderlabel}`);
+    }
   } else if (state.goodEmailAddresses.indexOf(emailAddress) >= 0) {
     // Email Address contact is already determined to be good
     incrementContactMessageCount(state, messageIsRecent);
@@ -176,9 +182,14 @@ function classifyEmailContact(state, emailThread, msg, emailAddress, messageIsRe
         // Save that this email address is in this folder group
         state.folderEmailAddressesMap[emailAddress] = folderLabel;
 
-        // Move the email to the folder group and update the GOA statistics
-        incrementFolderMessageCount(state, messageIsRecent, folderLabel);
-        applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
+        if (msg.isUnread()) {
+          // Message is unread, but is a contact so leave in InBox
+          incrementContactMessageCount(state, messageIsRecent);
+        } else {
+          // Move the email to the folder group and update the GOA statistics
+          incrementFolderMessageCount(state, messageIsRecent, folderLabel);
+          applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
+        }
 
         // Return because we handled this email message
         return;
