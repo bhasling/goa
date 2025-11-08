@@ -73,7 +73,7 @@ function readInbox(state) {
 
         // Process all the messages in the thread
         var messagesInThread = emailThread.getMessages();
-        var isGoaReportMessage = false;
+        var isGoaReportThread = false;
         var firstMessage = null;
         for (var j = 0; j < messagesInThread.length; j++) {
           var msg = messagesInThread[j];
@@ -83,12 +83,13 @@ function readInbox(state) {
           if (returnCode < 0) {
             return returnCode;
           } else if (returnCode > 0) {
-            isGoaReportMessage = true;
+            // this thread was a GoaMessage that was processed, but continue reading other threads
+            isGoaReportThread = true;
           }
         }
-        if (! isGoaReportMessage) {
-          // None of the message are Goa action messages. So process the thread
-          processMessage(state, emailThread, firstMessage);
+        if (! isGoaReportThread) {
+          // None of the message in the thread are Goa action messages. So process the thread
+          processMessageThread(state, emailThread, firstMessage);
         }
       }
 
@@ -111,7 +112,7 @@ function readInbox(state) {
  * A non-zero return code causes the main loop to restart reading
  * the InBox after making the changes specified in the action.
  */
-function processMessage(state, emailThread, msg) {
+function processMessageThread(state, emailThread, msg) {
   state.stats.numberEmailsProcessed = state.stats.numberEmailsProcessed + 1;
 
   // get the sender from the from part of the message
