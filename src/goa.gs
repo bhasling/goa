@@ -67,6 +67,7 @@ function readInbox(state) {
 
       // Loop through each thread in the batch
       for (var i = 0; i < threads.length; i++) {
+        // Logger.log(`Process thread ${i} of ${threads.length}`);
         state.stats.numberOfEmailThreadsProcessed = state.stats.numberOfEmailThreadsProcessed + 1;
         // Got an email address thread (which may have several messages)
         var emailThread = threads[i];
@@ -77,7 +78,7 @@ function readInbox(state) {
         var firstMessage = null;
         for (var j = 0; j < messagesInThread.length; j++) {
           var msg = messagesInThread[j];
-          if (j == 0) firstMessage = msg;
+          firstMessage = msg;
           var subject = msg.getSubject();
           var returnCode = parseGoaMessage(state, subject, emailThread, msg);
           if (returnCode < 0) {
@@ -131,7 +132,7 @@ function processMessageThread(state, emailThread, msg) {
   //Logger.log(`Parsed emailAddress to from ${emailAddress}`);
   // Find a GOA configured folder label that is label in the contacts of the email Message
   var folderLabel = state.emailAddressToFolderMap[emailAddress];
-  //Logger.log(`Folder label from cache for ${emailAddress} is ${folderLabel}`);
+  // Logger.log(`Folder label from FolderMap cache for ${emailAddress} is ${folderLabel}`);
 
   // Classify the message based on the email address contacts
   // Update the statistics of the email and move the email
@@ -142,11 +143,12 @@ function processMessageThread(state, emailThread, msg) {
     if (msg.isUnread()) {
       // Message is unread, but is a contact so leave in InBox
       incrementContactMessageCount(state, messageIsRecent);
+      // Logger.log(`${emailAddress} is in unread folder ${folderlabel}`);
     } else {
       // Message has been read so move from InBox to folderLabel
       applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
       incrementFolderMessageCount(state, messageIsRecent, folderLabel);
-      //Logger.log(`${emailAddress} is in folder ${folderlabel}`);
+      // Logger.log(`${emailAddress} is read in folder ${folderlabel}`);
     }
   } else if (state.goodEmailAddresses.indexOf(emailAddress) >= 0) {
     // Email Address contact is already determined to be good
@@ -183,13 +185,16 @@ function classifyEmailContact(state, emailThread, msg, emailAddress, messageIsRe
         // Save that this email address is in this folder group
         state.folderEmailAddressesMap[emailAddress] = folderLabel;
 
+        var dt = msg.getDate();
         if (msg.isUnread()) {
           // Message is unread, but is a contact so leave in InBox
           incrementContactMessageCount(state, messageIsRecent);
+          //Logger.log(`Folder label classified for ${emailAddress} is unread and in folder ${folderLabel} recent ${messageIsRecent} DT ${dt}`);
         } else {
           // Move the email to the folder group and update the GOA statistics
           incrementFolderMessageCount(state, messageIsRecent, folderLabel);
           applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel);
+          //Logger.log(`Folder label classified for ${emailAddress} is read and in folder ${folderLabel} recent ${messageIsRecent} DT ${dt}`);
         }
 
         // Return because we handled this email message
@@ -214,19 +219,10 @@ function classifyEmailContact(state, emailThread, msg, emailAddress, messageIsRe
 
 /** Apply a folderLabel to the email thread and remove from the InBox. */
 function applyLabelToEmailMessage(state, emailThread, msg, emailAddress, folderLabel) {
+  //Logger.log(`Apply Label to ${emailAddress} to folder ${folderLabel}`);
   var label = GmailApp.getUserLabelByName(folderLabel) || GmailApp.createLabel(folderLabel);
-  var existingLabels = emailThread.getLabels();
-  var alreadyLabeled = existingLabels.some(function (l) {
-    return l.getName() === label.getName();
-  });
-  if (!alreadyLabeled) {
-    emailThread.addLabel(label);
-    emailThread.moveToArchive();
-  } else {
-    // Add the label anyway because there is a new message for the label
-    emailThread.addLabel(label);
-    emailThread.moveToArchive();
-  }
+  emailThread.addLabel(label);
+  emailThread.moveToArchive();
 }
 
 /** 
